@@ -1,9 +1,14 @@
-import React from "react";
+import { useContext } from "react";
+import { ProductContext } from "../../../hooks/projectContext";
 
 const Header = () => {
+  const project = useContext(ProductContext);
+
   return (
     <header className="bg-green-900 flex justify-between items-center p-4">
-      <p className="text">SISI</p>
+      <p className="text">
+        {project.name} / {project.price}
+      </p>
 
       <div>
         <ul className="flex gap-4 text-slate-50">
