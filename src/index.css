@@ -1,1 +1,58 @@
 @import "tailwindcss";
+
+/* Colours come from the county itself: tea fields, murram roads, maize and the lake */
+@theme {
+  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+
+  --color-paper: #f5f7f4;
+  --color-ink: #1c2620;
+  --color-muted: #5a665f;
+  --color-line: #dae1db;
+
+  --color-tea: #1f5c3a;
+  --color-tea-dark: #143d26;
+  --color-tea-light: #e3efe6;
+  --color-murram: #b0502a;
+  --color-maize: #d99a1b;
+  --color-maize-dark: #7a5208;
+  --color-lake: #2d6797;
+}
+
+/* Wide, heavy Archivo for headings, like the lettering on a road sign */
+@utility type-display {
+  font-stretch: 125%;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+@layer base {
+  body {
+    @apply bg-paper text-ink antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-tea;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+  }
+}
+
+/* The one entrance animation: money bars on the home page fill from the left */
+@keyframes fill-in {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@utility animate-fill-in {
+  animation: fill-in 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  transform-origin: left;
+}

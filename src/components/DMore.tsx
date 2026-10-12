@@ -1,4 +1,3 @@
-import React from "react";
 
 const DMore = ({ name, age }: { name: string; age: number }) => {
   return (

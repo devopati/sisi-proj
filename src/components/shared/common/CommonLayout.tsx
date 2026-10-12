@@ -1,16 +1,23 @@
-import React, { useContext } from "react";
-import Header from "./Header";
+import { useEffect } from "react";
+import { Outlet, useLocation } from "react-router";
 import Footer from "./Footer";
+import Header from "./Header";
 
-interface CommonLayoutProps {
-  children: React.ReactNode;
-}
+// Every page renders inside <Outlet />, between the header and the footer
+const CommonLayout = () => {
+  const { pathname } = useLocation();
 
-const CommonLayout: React.FC<CommonLayoutProps> = ({ children }) => {
+  // Start each new page at the top
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
   return (
-    <div>
+    <div className="flex min-h-screen flex-col">
       <Header />
-      {children}
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 md:px-6 md:py-14">
+        <Outlet />
+      </main>
       <Footer />
     </div>
   );
