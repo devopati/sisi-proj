@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router";
 import { useAuth } from "../../../hooks/useAuth";
+import { useInstallPrompt } from "../../../hooks/useInstallPrompt";
 import LinkButton from "../ui/LinkButton";
+import OfflineBanner from "./OfflineBanner";
 
 const links = [
   { to: "/projects", label: "Projects" },
@@ -16,6 +18,7 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 
 const Header = () => {
   const { user, signOut } = useAuth();
+  const { canInstall, install } = useInstallPrompt();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -27,9 +30,20 @@ const Header = () => {
     navigate("/");
   };
 
+  // Only shown when the browser says SISI can be installed
+  const installButton = canInstall && (
+    <button
+      type="button"
+      onClick={install}
+      className="rounded-md border border-tea px-3 py-2 font-semibold text-tea hover:bg-tea-light"
+    >
+      Install app
+    </button>
+  );
+
   const authLinks = user ? (
     <>
-      <span className="text-sm text-muted">
+      <span className="text-sm text-muted lg:hidden xl:inline">
         Logged in as <strong className="text-ink">{user.name}</strong>
       </span>
       <button type="button" onClick={handleLogOut} className="rounded-md px-3 py-2 font-semibold text-tea hover:bg-tea-light">
@@ -61,7 +75,10 @@ const Header = () => {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2 lg:flex">{authLinks}</div>
+        <div className="hidden items-center gap-2 lg:flex">
+          {installButton}
+          {authLinks}
+        </div>
 
         <button
           type="button"
@@ -83,9 +100,14 @@ const Header = () => {
               </NavLink>
             ))}
           </nav>
-          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">{authLinks}</div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
+            {installButton}
+            {authLinks}
+          </div>
         </div>
       )}
+
+      <OfflineBanner />
     </header>
   );
 };

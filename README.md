@@ -16,6 +16,16 @@ Log in with `demo@example.com` / `password123`, or register a new account. No re
 
 The API keeps everything in memory, so restarting it resets all the data and logs everyone out.
 
+## Install it as an app
+
+SISI is a progressive web app: it can be installed, and pages you've opened still work offline. The service worker only runs in the production build:
+
+```bash
+npm run pwa   # build, then serve it → http://localhost:4173
+```
+
+In Chrome or Edge, click **Install app** in the header. The worker is [public/sw.js](public/sw.js) and the app details are in [public/manifest.webmanifest](public/manifest.webmanifest).
+
 ## Pages
 
 | Page | URL | File |

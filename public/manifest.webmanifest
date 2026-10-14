@@ -1,0 +1,66 @@
+{
+  "id": "/",
+  "name": "SISI – Sisi County",
+  "short_name": "SISI",
+  "description": "Propose, vote on and follow public projects in Sisi County.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f7f4",
+  "theme_color": "#143d26",
+  "categories": ["government"],
+  "icons": [
+    {
+      "src": "/pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Browse projects",
+      "url": "/projects",
+      "icons": [{ "src": "/pwa-96.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Propose a project",
+      "url": "/projects/propose",
+      "icons": [{ "src": "/pwa-96.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Follow the money",
+      "url": "/projects/monitoring",
+      "icons": [{ "src": "/pwa-96.png", "sizes": "96x96", "type": "image/png" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/home-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "The home page, showing spending in each ward"
+    },
+    {
+      "src": "/screenshots/project-narrow.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "A project's money, progress and votes on a phone"
+    }
+  ]
+}

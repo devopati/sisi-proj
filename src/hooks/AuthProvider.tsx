@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { type CurrUserType, type UserType } from "../types";
-import { api } from "../utils/api";
+import { api, ApiError } from "../utils/api";
 import { AuthContext } from "./authContext";
 
 // const name = "david"
@@ -33,7 +33,13 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     api<UserType>("/auth/me", { token })
       .then((me) => setUser({ ...me, token }))
-      .catch(() => localStorage.removeItem(TOKEN_KEY)) // the token stopped working, e.g. the API restarted
+      .catch((error) => {
+        // Forget the token only when the API rejected it (e.g. the API restarted).
+        // If we're just offline, keep it for when the connection comes back.
+        if (error instanceof ApiError && error.status === 401) {
+          localStorage.removeItem(TOKEN_KEY);
+        }
+      })
       .finally(() => setChecking(false));
   }, []);
 

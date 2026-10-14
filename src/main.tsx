@@ -4,6 +4,9 @@ import { BrowserRouter } from "react-router";
 import App from "./App.tsx";
 import AuthProvider from "./hooks/AuthProvider.tsx";
 import "./index.css";
+import { registerServiceWorker } from "./utils/registerServiceWorker.ts";
+
+registerServiceWorker();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
