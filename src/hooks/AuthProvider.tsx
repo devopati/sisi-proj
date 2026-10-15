@@ -3,25 +3,16 @@ import { type CurrUserType, type UserType } from "../types";
 import { api, ApiError } from "../utils/api";
 import { AuthContext } from "./authContext";
 
-// const name = "david"
-// const obj = {
-//   name:"pp",
-//   age:29
-// }
-
-// store variables that are not objects or arrays just a string
-// localStorage.setItem("my-name",name) //store string
-// localStorage.setItem("my-obj",JSON.stringify(obj))
-
-// const myObj = JSON.parse(localStorage.getItem("my-obj") as any) //get stored value and convert back to what it was
-
-// localStorage.clear(); //Clear entire localstorage
-// localStorage.removeItem("my-name") //remove specific item
-
 const TOKEN_KEY = "sisi-token";
+const USER_KEY = "sisi-user"; // New key to store the full user object
 
 const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<CurrUserType | null>(null);
+  // 1. Initialize state with the cached user if it exists
+  const [user, setUser] = useState<CurrUserType | null>(() => {
+    const cachedUser = localStorage.getItem(USER_KEY);
+    return cachedUser ? JSON.parse(cachedUser) : null;
+  });
+
   const [checking, setChecking] = useState(() =>
     Boolean(localStorage.getItem(TOKEN_KEY)),
   );
@@ -32,12 +23,20 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!token) return;
 
     api<UserType>("/auth/me", { token })
-      .then((me) => setUser({ ...me, token }))
+      .then((me) => {
+        const updatedUser = { ...me, token };
+        setUser(updatedUser);
+        // Keep the cache fresh with the latest data from the API
+        localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+      })
       .catch((error) => {
-        // Forget the token only when the API rejected it (e.g. the API restarted).
-        // If we're just offline, keep it for when the connection comes back.
+        // Forget the token ONLY when the API explicitly rejected it (401 Unauthorized).
+        // If we're offline (status 0) or there's another network error,
+        // we do nothing here, so the initialized cached user remains active!
         if (error instanceof ApiError && error.status === 401) {
           localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          setUser(null);
         }
       })
       .finally(() => setChecking(false));
@@ -45,11 +44,13 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = (newUser: CurrUserType) => {
     localStorage.setItem(TOKEN_KEY, newUser.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(newUser)); // 2. Save full user object
     setUser(newUser);
   };
 
   const signOut = () => {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY); // 3. Clear user object on sign out
     setUser(null);
   };
 
