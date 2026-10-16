@@ -135,6 +135,67 @@ self.addEventListener("message", (event) => {
   }
 });
 
+// ---------- 5. sync: handle background sync for offline votes ----------
+
+self.addEventListener("sync", (event) => {
+  if (event.tag === "sync-votes") {
+    event.waitUntil(syncPendingVotes());
+  }
+});
+
+async function syncPendingVotes() {
+  // Read the queue using native localStorage (accessible in vanilla Service Workers)
+  const pendingData = localStorage.getItem("sisi-pending-votes");
+  if (!pendingData) return;
+
+  let pending = [];
+  try {
+    pending = JSON.parse(pendingData);
+  } catch (e) {
+    console.error("Failed to parse pending votes in SW", e);
+    return;
+  }
+
+  if (pending.length === 0) return;
+
+  // Clear the queue optimistically
+  localStorage.removeItem("sisi-pending-votes");
+
+  const failedVotes = [];
+
+  for (const vote of pending) {
+    try {
+      // ⚠️ IMPORTANT: Replace this with your ACTUAL deployed Render API URL!
+      // The service worker runs in the background and needs the absolute URL.
+      const API_BASE_URL = "https://sisi-api.onrender.com/api";
+
+      const response = await fetch(
+        `${API_BASE_URL}/projects/${vote.projectId}/vote`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${vote.token}`,
+          },
+          body: JSON.stringify({ choice: vote.choice }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (err) {
+      console.warn("Background sync vote failed, re-queuing:", err);
+      failedVotes.push(vote);
+    }
+  }
+
+  // If any votes failed, put them back in the queue for the next sync attempt
+  if (failedVotes.length > 0) {
+    localStorage.setItem("sisi-pending-votes", JSON.stringify(failedVotes));
+  }
+}
+
 // ---------- caching strategies ----------
 
 // Network first: fresh data when online, the last saved copy when offline

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
+import localforage from "localforage"; // 1. Import localforage
 import { type Votes, type VoteResult } from "../types";
 import { api } from "../utils/api";
 import { useAuth } from "./useAuth";
@@ -7,6 +8,13 @@ import { useAuth } from "./useAuth";
 type Choice = "support" | "reject";
 
 const PENDING_VOTES_KEY = "sisi-pending-votes";
+
+// 2. Define the shape of our queued vote items
+type VoteQueueItem = {
+  projectId: number;
+  choice: Choice;
+  token: string;
+};
 
 // Voting needs a logged-in user. Visitors are sent to the login page and brought back afterwards.
 export const useVote = (projectId: number, initialVotes: Votes) => {
@@ -20,36 +28,40 @@ export const useVote = (projectId: number, initialVotes: Votes) => {
   const [error, setError] = useState("");
   const [isOfflineVote, setIsOfflineVote] = useState(false);
 
+  // 3. Helper function to sync votes (used by both 'online' event and Background Sync)
+  const syncPendingVotes = async () => {
+    const pending =
+      (await localforage.getItem<VoteQueueItem[]>(PENDING_VOTES_KEY)) || [];
+    if (pending.length === 0) return;
+
+    // Clear the queue optimistically to prevent duplicate sends
+    await localforage.removeItem(PENDING_VOTES_KEY);
+
+    const failedVotes: VoteQueueItem[] = [];
+    for (const vote of pending) {
+      try {
+        await api<VoteResult>(`/projects/${vote.projectId}/vote`, {
+          method: "POST",
+          body: { choice: vote.choice },
+          token: vote.token,
+        });
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (err) {
+        // If it fails (e.g., temporary glitch), push it back to the queue
+        failedVotes.push(vote);
+      }
+    }
+
+    // Save any votes that failed to send back to the queue
+    if (failedVotes.length > 0) {
+      await localforage.setItem(PENDING_VOTES_KEY, failedVotes);
+    }
+  };
+
   // Listen for the browser coming back online to sync queued votes
   useEffect(() => {
     const handleOnline = async () => {
-      const pending = JSON.parse(
-        localStorage.getItem(PENDING_VOTES_KEY) || "[]",
-      );
-      if (pending.length === 0) return;
-
-      // Clear the queue optimistically to prevent duplicate sends
-      localStorage.removeItem(PENDING_VOTES_KEY);
-
-      const failedVotes = [];
-      for (const vote of pending) {
-        try {
-          await api<VoteResult>(`/projects/${vote.projectId}/vote`, {
-            method: "POST",
-            body: { choice: vote.choice },
-            token: vote.token,
-          });
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (err) {
-          // If it fails (e.g., temporary glitch), push it back to the queue
-          failedVotes.push(vote);
-        }
-      }
-
-      // Save any votes that failed to send back to the queue
-      if (failedVotes.length > 0) {
-        localStorage.setItem(PENDING_VOTES_KEY, JSON.stringify(failedVotes));
-      }
+      await syncPendingVotes();
     };
 
     window.addEventListener("online", handleOnline);
@@ -62,24 +74,33 @@ export const useVote = (projectId: number, initialVotes: Votes) => {
       return;
     }
 
-    // 1. Handle Offline State
+    // 4. Handle Offline State
     if (!navigator.onLine) {
-      const pending = JSON.parse(
-        localStorage.getItem(PENDING_VOTES_KEY) || "[]",
-      );
+      const pending =
+        (await localforage.getItem<VoteQueueItem[]>(PENDING_VOTES_KEY)) || [];
       pending.push({ projectId, choice, token: user.token });
-      localStorage.setItem(PENDING_VOTES_KEY, JSON.stringify(pending));
+      await localforage.setItem(PENDING_VOTES_KEY, pending);
 
       setError("Will send when you're back online");
       setIsOfflineVote(true);
 
-      // Optional: Optimistically update the UI so the user sees their vote immediately
-      // setMyVote(choice);
-      // setVotes(prev => ({ ...prev, [choice]: (prev[choice] || 0) + 1 }));
+      // 5. Register Background Sync!
+      if ("serviceWorker" in navigator && "SyncManager" in window) {
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          await (
+            registration as ServiceWorkerRegistration & {
+              sync: { register: (tag: string) => Promise<void> };
+            }
+          ).sync.register("sync-votes");
+        } catch (err) {
+          console.warn("Background Sync registration failed:", err);
+        }
+      }
       return;
     }
 
-    // 2. Handle Online State
+    // 6. Handle Online State
     setSending(true);
     setError("");
     setIsOfflineVote(false);
