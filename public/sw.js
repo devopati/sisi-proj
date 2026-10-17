@@ -27,27 +27,48 @@ const APP_SHELL = [
   "/pwa-512.png",
 ];
 
-// ---------- 1. install: save the app shell ----------
+// ---------- 1. install: save the app shell AND critical API data ----------
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(APP_CACHE);
+      const appCache = await caches.open(APP_CACHE);
+      const dataCache = await caches.open(DATA_CACHE);
 
       // Save the page itself
       const page = await fetch("/", { cache: "no-store" });
-      await cache.put("/", page.clone());
+      await appCache.put("/", page.clone());
 
       // Vite renames the built JS and CSS on every build (index-B9Ql3zuN.js),
       // so read their current names from the page we just downloaded
       const html = await page.text();
-      const builtFiles = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)]
-        .map((match) => match[1]);
+      const builtFiles = [
+        ...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g),
+      ].map((match) => match[1]);
 
-      await cache.addAll([...APP_SHELL, ...builtFiles]);
+      await appCache.addAll([...APP_SHELL, ...builtFiles]);
 
-      // Take over now, instead of waiting for every open tab to close
-      await self.skipWaiting();
+      // PRE-CACHE CRITICAL API DATA
+      // This ensures the projects and wards lists work offline even on the very first visit.
+      try {
+        // NOTE: If your deployed API is on a different domain (e.g., Render.com),
+        // replace these relative paths with your absolute API URL:
+        // e.g., fetch("https://your-api-domain.com/api/projects")
+        const projectsRes = await fetch("/api/projects");
+        if (projectsRes.ok)
+          await dataCache.put("/api/projects", projectsRes.clone());
+
+        const wardsRes = await fetch("/api/wards");
+        if (wardsRes.ok) await dataCache.put("/api/wards", wardsRes.clone());
+      } catch (err) {
+        console.warn(
+          "Could not pre-cache API data during install (might be offline or API down)",
+          err,
+        );
+      }
+
+      // REMOVED: await self.skipWaiting();
+      // The new worker will now wait in the "installed" state until we explicitly tell it to skip.
     })(),
   );
 });
@@ -105,6 +126,75 @@ self.addEventListener("fetch", (event) => {
 
   // Anything else (like the Google Map on the contact page) isn't touched
 });
+
+// ---------- 4. message: handle skip waiting command ----------
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
+// ---------- 5. sync: handle background sync for offline votes ----------
+
+self.addEventListener("sync", (event) => {
+  if (event.tag === "sync-votes") {
+    event.waitUntil(syncPendingVotes());
+  }
+});
+
+async function syncPendingVotes() {
+  // Read the queue using native localStorage (accessible in vanilla Service Workers)
+  const pendingData = localStorage.getItem("sisi-pending-votes");
+  if (!pendingData) return;
+
+  let pending = [];
+  try {
+    pending = JSON.parse(pendingData);
+  } catch (e) {
+    console.error("Failed to parse pending votes in SW", e);
+    return;
+  }
+
+  if (pending.length === 0) return;
+
+  // Clear the queue optimistically
+  localStorage.removeItem("sisi-pending-votes");
+
+  const failedVotes = [];
+
+  for (const vote of pending) {
+    try {
+      // ⚠️ IMPORTANT: Replace this with your ACTUAL deployed Render API URL!
+      // The service worker runs in the background and needs the absolute URL.
+      const API_BASE_URL = "https://sisi-api.onrender.com/api";
+
+      const response = await fetch(
+        `${API_BASE_URL}/projects/${vote.projectId}/vote`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${vote.token}`,
+          },
+          body: JSON.stringify({ choice: vote.choice }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (err) {
+      console.warn("Background sync vote failed, re-queuing:", err);
+      failedVotes.push(vote);
+    }
+  }
+
+  // If any votes failed, put them back in the queue for the next sync attempt
+  if (failedVotes.length > 0) {
+    localStorage.setItem("sisi-pending-votes", JSON.stringify(failedVotes));
+  }
+}
 
 // ---------- caching strategies ----------
 

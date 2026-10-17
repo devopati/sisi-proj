@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router";
 import Footer from "./Footer";
 import Header from "./Header";
+import { UpdatePrompt } from "../UpdatePrompt"; // Added import for UpdatePrompt
 
 // Every page renders inside <Outlet />, between the header and the footer
 const CommonLayout = () => {
@@ -19,6 +20,9 @@ const CommonLayout = () => {
         <Outlet />
       </main>
       <Footer />
+
+      {/* Render the UpdatePrompt here so it floats above all pages */}
+      <UpdatePrompt />
     </div>
   );
 };
