@@ -1,4 +1,4 @@
-import { useState, type SubmitEvent } from "react";
+import { useRef, useState, type SubmitEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import MoneySummary from "../components/projects/MoneySummary";
 import ProjectCard from "../components/projects/ProjectCard";
@@ -17,6 +17,7 @@ import { useForm } from "../hooks/useForm";
 import { type Feedback, type Project, type Stats } from "../types";
 import { api } from "../utils/api";
 import { projectPath } from "../utils/paths";
+import { useToast } from "../contexts/ToastContext";
 
 const tabs = [
   { id: "vote", label: "Vote on proposals" },
@@ -26,7 +27,11 @@ const tabs = [
 
 // ---------- Vote ----------
 const VoteTab = () => {
-  const { data: proposals, error, refetch } = useFetch<Project[]>("/projects?status=Pending");
+  const {
+    data: proposals,
+    error,
+    refetch,
+  } = useFetch<Project[]>("/projects?status=Pending");
 
   if (error) return <ErrorMessage message={error} onRetry={refetch} />;
   if (!proposals) return <Loader label="Loading proposals" />;
@@ -34,11 +39,14 @@ const VoteTab = () => {
   return (
     <div className="flex flex-col gap-6">
       <p className="max-w-2xl text-lg text-muted">
-        These proposals are waiting for residents' votes. The ones with the most support go to the county for review.
+        These proposals are waiting for residents' votes. The ones with the most
+        support go to the county for review.
       </p>
       {proposals.length === 0 ? (
         <div className="flex flex-col items-start gap-4">
-          <p className="text-lg">No proposals are waiting for votes right now.</p>
+          <p className="text-lg">
+            No proposals are waiting for votes right now.
+          </p>
           <LinkButton to="/projects/propose" title="Propose a project" />
         </div>
       ) : (
@@ -69,7 +77,11 @@ const MoneyTab = () => {
         </section>
       </div>
       <div>
-        <LinkButton to="/projects/monitoring" title="See spending project by project" variant="outline" />
+        <LinkButton
+          to="/projects/monitoring"
+          title="See spending project by project"
+          variant="outline"
+        />
       </div>
     </div>
   );
@@ -78,8 +90,13 @@ const MoneyTab = () => {
 // ---------- Feedback ----------
 const FeedbackTab = () => {
   const { user, checking } = useAuth();
+  const { showToast } = useToast();
   const { data: projects } = useFetch<Project[]>("/projects");
-  const { values, handleChange, setValues } = useForm({ projectId: "", name: "", message: "" });
+  const { values, handleChange, setValues } = useForm({
+    projectId: "",
+    name: "",
+    message: "",
+  });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [postedOn, setPostedOn] = useState<Project | null>(null);
@@ -94,7 +111,11 @@ const FeedbackTab = () => {
         method: "POST",
         body: { message: values.message, name: user ? user.name : values.name },
       });
-      setPostedOn(projects?.find((project) => project.id === Number(values.projectId)) ?? null);
+      showToast("Feedback posted");
+      setPostedOn(
+        projects?.find((project) => project.id === Number(values.projectId)) ??
+          null,
+      );
       setValues((prev) => ({ ...prev, message: "" }));
     } catch (err) {
       setError((err as Error).message);
@@ -105,8 +126,17 @@ const FeedbackTab = () => {
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_300px]">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5 rounded-xl border border-line bg-white p-6">
-        <SelectField label="Project" name="projectId" value={values.projectId} onChange={handleChange} required>
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-5 rounded-xl border border-line bg-white p-6"
+      >
+        <SelectField
+          label="Project"
+          name="projectId"
+          value={values.projectId}
+          onChange={handleChange}
+          required
+        >
           <option value="">Choose a project</option>
           {projects?.map((project) => (
             <option key={project.id} value={project.id}>
@@ -139,9 +169,15 @@ const FeedbackTab = () => {
 
         {error && <ErrorMessage message={error} />}
         {postedOn && (
-          <p role="status" className="rounded-lg bg-tea-light px-4 py-3 text-tea-dark">
+          <p
+            role="status"
+            className="rounded-lg bg-tea-light px-4 py-3 text-tea-dark"
+          >
             Feedback posted on {postedOn.title}.{" "}
-            <Link to={`${projectPath(postedOn)}#feedback`} className="font-semibold underline underline-offset-4">
+            <Link
+              to={`${projectPath(postedOn)}#feedback`}
+              className="font-semibold underline underline-offset-4"
+            >
               See it on the project page
             </Link>
           </p>
@@ -156,12 +192,16 @@ const FeedbackTab = () => {
       </form>
 
       <aside className="self-start text-muted">
-        <h2 className="text-lg font-bold text-ink">Good feedback is specific</h2>
+        <h2 className="text-lg font-bold text-ink">
+          Good feedback is specific
+        </h2>
         <p className="mt-3">
-          Say where you saw something and when. "The culvert near Bondeni river floods after rain" helps the county
-          more than "the road is bad".
+          Say where you saw something and when. "The culvert near Bondeni river
+          floods after rain" helps the county more than "the road is bad".
         </p>
-        <p className="mt-3">Anyone can post feedback. You don't need an account.</p>
+        <p className="mt-3">
+          Anyone can post feedback. You don't need an account.
+        </p>
       </aside>
     </div>
   );
@@ -170,27 +210,73 @@ const FeedbackTab = () => {
 const Participate = () => {
   // The open tab lives in the URL (?tab=money) so other pages can link straight to it
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = tabs.some((tab) => tab.id === searchParams.get("tab")) ? searchParams.get("tab") : "vote";
+  const activeTab = tabs.some((tab) => tab.id === searchParams.get("tab"))
+    ? searchParams.get("tab")
+    : "vote";
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const selectTab = (index: number) => {
+    const tab = tabs[index];
+    if (!tab) return;
+
+    setSearchParams({ tab: tab.id }, { replace: true });
+  };
+  const handleTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    let nextIndex: number;
+    switch (event.key) {
+      case "ArrowRight":
+        nextIndex = (index + 1) % tabs.length;
+        break;
+      case "ArrowLeft":
+        nextIndex = (index - 1 + tabs.length) % tabs.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = tabs.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    selectTab(nextIndex);
+    tabRefs.current[nextIndex]?.focus();
+  };
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="mx-auto max-w-6xl px-4 py-12 md:px-6">
       <PageHeader
-        title="Have your say"
-        intro="Vote on new proposals, check how public money is being spent, and tell the county what you see on the ground."
+        title="Participate"
       />
-
-      <div role="tablist" aria-label="Ways to take part" className="flex flex-wrap gap-2 border-b border-line">
-        {tabs.map((tab) => (
+      <p className="mb-6 max-w-2xl text-muted">
+        Vote on proposals, follow the money, and give feedback on projects.
+      </p>
+      <div
+        role="tablist"
+        aria-label="Ways to take part"
+        className="flex flex-wrap gap-2 border-b border-line"
+      >
+        {tabs.map((tab, index) => (
           <button
             key={tab.id}
             type="button"
             role="tab"
             id={`tab-${tab.id}`}
+            ref={(element) => {
+              tabRefs.current[index] = element;
+            }}
+            tabIndex={activeTab === tab.id ? 0 : -1}
             aria-selected={activeTab === tab.id}
             aria-controls="participate-panel"
-            onClick={() => setSearchParams({ tab: tab.id }, { replace: true })}
+            onClick={() => selectTab(index)}
+            onKeyDown={(event) => handleTabKeyDown(event, index)}
             className={`-mb-px border-b-2 px-4 py-3 font-semibold transition ${
-              activeTab === tab.id ? "border-tea text-tea" : "border-transparent text-muted hover:text-ink"
+              activeTab === tab.id
+                ? "border-tea text-tea"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             {tab.label}
@@ -198,7 +284,11 @@ const Participate = () => {
         ))}
       </div>
 
-      <div role="tabpanel" id="participate-panel" aria-labelledby={`tab-${activeTab}`}>
+      <div
+        role="tabpanel"
+        id="participate-panel"
+        aria-labelledby={`tab-${activeTab}`}
+      >
         {activeTab === "vote" && <VoteTab />}
         {activeTab === "money" && <MoneyTab />}
         {activeTab === "feedback" && <FeedbackTab />}

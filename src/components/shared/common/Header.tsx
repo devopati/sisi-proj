@@ -4,6 +4,8 @@ import { useAuth } from "../../../hooks/useAuth";
 import { useInstallPrompt } from "../../../hooks/useInstallPrompt";
 import LinkButton from "../ui/LinkButton";
 import OfflineBanner from "./OfflineBanner";
+import { useToast } from "../../../contexts/ToastContext";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 const links = [
   { to: "/projects", label: "Projects" },
@@ -14,10 +16,14 @@ const links = [
 ];
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
-  `rounded-md px-3 py-2 font-medium transition ${isActive ? "bg-tea-light text-tea-dark" : "hover:text-tea"}`;
+  `rounded-md px-3 py-2 font-medium transition ${
+    isActive ? "bg-tea-light text-tea-dark" : "hover:text-tea"
+  }`;
 
 const Header = () => {
   const { user, signOut } = useAuth();
+  const { showToast } = useToast();
+  const { theme, toggleTheme } = useTheme();
   const { canInstall, install } = useInstallPrompt();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -27,80 +33,126 @@ const Header = () => {
   const handleLogOut = () => {
     signOut();
     closeMenu();
+    showToast("Logged out");
     navigate("/");
   };
 
-  // Only shown when the browser says SISI can be installed
-  const installButton = canInstall && (
+  const installButton = canInstall ? (
     <button
       type="button"
       onClick={install}
-      className="rounded-md border border-tea px-3 py-2 font-semibold text-tea hover:bg-tea-light"
+      className="rounded-md border border-tea px-3 py-2 text-sm font-medium text-tea hover:bg-tea-light"
     >
       Install app
+    </button>
+  ) : null;
+
+  const themeButton = (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      className="rounded-md border border-tea px-3 py-2 text-sm font-medium text-tea hover:bg-tea-light"
+    >
+      Switch to {theme === "dark" ? "light" : "dark"} mode
     </button>
   );
 
   const authLinks = user ? (
-    <>
-      <span className="text-sm text-muted lg:hidden xl:inline">
-        Logged in as <strong className="text-ink">{user.name}</strong>
-      </span>
-      <button type="button" onClick={handleLogOut} className="rounded-md px-3 py-2 font-semibold text-tea hover:bg-tea-light">
+    <div className="flex flex-col items-start gap-2 lg:flex-row lg:items-center">
+      <span className="text-sm text-muted">Logged in as {user.name}</span>
+
+      <button
+        type="button"
+        onClick={handleLogOut}
+        className="rounded-md px-3 py-2 text-sm font-medium hover:text-tea"
+      >
         Log out
       </button>
-    </>
+    </div>
   ) : (
-    <>
-      <Link to="/login" onClick={closeMenu} className="rounded-md px-3 py-2 font-semibold text-tea hover:bg-tea-light">
-        Log in
-      </Link>
-      <LinkButton to="/register" title="Register" onClick={closeMenu} />
-    </>
+    <div className="flex flex-col gap-2 lg:flex-row">
+      <LinkButton to="/login" title="Login" variant="outline" />
+
+      <LinkButton to="/register" title="Register" variant="solid" />
+    </div>
   );
 
   return (
-    <header className="sticky top-0 z-20 border-b border-line bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 md:px-6">
-        <Link to="/" onClick={closeMenu} className="flex items-baseline gap-2">
-          <span className="type-display text-2xl text-tea">SISI</span>
-          <span className="text-sm text-muted">Sisi County</span>
+    <header className="border-b border-line bg-white dark:bg-surface">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+        <Link
+          to="/"
+          onClick={closeMenu}
+          className="text-xl font-bold text-tea-dark"
+        >
+          SISI
         </Link>
 
+        {/* Desktop navigation */}
         <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
           {links.map((link) => (
             <NavLink key={link.to} to={link.to} className={navClass}>
               {link.label}
             </NavLink>
           ))}
+
+          {user && (
+            <NavLink to="/my-proposals" className={navClass}>
+              My proposals
+            </NavLink>
+          )}
         </nav>
 
+        {/* Desktop account actions */}
         <div className="hidden items-center gap-2 lg:flex">
+          {themeButton}
           {installButton}
           {authLinks}
         </div>
 
+        {/* Mobile menu toggle */}
         <button
           type="button"
-          onClick={() => setMenuOpen((open) => !open)}
           aria-expanded={menuOpen}
           aria-controls="mobile-menu"
-          className="rounded-md border border-line px-3 py-2 font-semibold lg:hidden"
+          onClick={() => setMenuOpen((open) => !open)}
+          className="rounded-md border border-line px-3 py-2 text-sm font-medium lg:hidden"
         >
           {menuOpen ? "Close" : "Menu"}
         </button>
       </div>
 
+      {/* Mobile navigation */}
       {menuOpen && (
-        <div id="mobile-menu" className="border-t border-line px-4 pb-5 lg:hidden">
-          <nav aria-label="Main" className="flex flex-col py-3">
+        <div
+          id="mobile-menu"
+          className="border-t border-line px-4 py-4 lg:hidden"
+        >
+          <nav aria-label="Mobile" className="flex flex-col gap-2">
             {links.map((link) => (
-              <NavLink key={link.to} to={link.to} onClick={closeMenu} className={navClass}>
+              <NavLink
+                key={link.to}
+                to={link.to}
+                onClick={closeMenu}
+                className={navClass}
+              >
                 {link.label}
               </NavLink>
             ))}
+
+            {user && (
+              <NavLink
+                to="/my-proposals"
+                onClick={closeMenu}
+                className={navClass}
+              >
+                My proposals
+              </NavLink>
+            )}
           </nav>
-          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
+
+          <div className="mt-4 flex flex-col items-start gap-3 border-t border-line pt-4">
+            {themeButton}
             {installButton}
             {authLinks}
           </div>

@@ -22,3 +22,25 @@ export const formatDate = (date: string | null) =>
 
 // Matches the server: only these projects have money committed
 export const isFunded = (status: string) => ["Approved", "In Progress", "Completed"].includes(status);
+
+
+export const formatTimeLeft = (endDate: string | null): string | null => {
+  if (!endDate) return null;
+
+  // Compare calendar dates to avoid timezone-related issues.
+  const [year, month, day] = endDate.slice(0, 10).split("-").map(Number);
+  const dueDate = new Date(year, month - 1, day);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const daysLeft = Math.round(
+    (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (daysLeft > 0) return `${daysLeft} days left`;
+  if (daysLeft === 0) return "Due today";
+
+  const overdueDays = Math.abs(daysLeft);
+  return `Overdue by ${overdueDays} days`;
+};

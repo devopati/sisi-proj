@@ -19,9 +19,21 @@ import { AuthContext } from "./authContext";
 // localStorage.removeItem("my-name") //remove specific item
 
 const TOKEN_KEY = "sisi-token";
+const USER_KEY = "sisi-user";
 
 const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<CurrUserType | null>(null);
+  const [user, setUser] = useState<CurrUserType | null>(() => {
+    const savedUser = localStorage.getItem(USER_KEY);
+
+    if (!savedUser) return null;
+    try {
+      return JSON.parse(savedUser) as CurrUserType;
+    } catch {
+      localStorage.removeItem(USER_KEY);
+      return null;
+    }
+  });
+
   const [checking, setChecking] = useState(() =>
     Boolean(localStorage.getItem(TOKEN_KEY)),
   );
@@ -31,26 +43,48 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) return;
 
+    let cancelled = false;
+
     api<UserType>("/auth/me", { token })
-      .then((me) => setUser({ ...me, token }))
+      .then((me) => {
+        if (cancelled) return;
+         const currentUser = { ...me, token } as CurrUserType;
+
+         localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+         setUser(currentUser);
+      })
       .catch((error) => {
+        if (cancelled) return;
         // Forget the token only when the API rejected it (e.g. the API restarted).
         // If we're just offline, keep it for when the connection comes back.
         if (error instanceof ApiError && error.status === 401) {
           localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          setUser(null);
         }
+        //For network/offline errors, keep the cached user and token
       })
-      .finally(() => setChecking(false));
+      .finally(() => {
+        if (!cancelled) setChecking(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const signIn = (newUser: CurrUserType) => {
     localStorage.setItem(TOKEN_KEY, newUser.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(newUser));
     setUser(newUser);
+    setChecking(false);
   };
 
   const signOut = () => {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
     setUser(null);
+    setChecking(false);
   };
 
   return (

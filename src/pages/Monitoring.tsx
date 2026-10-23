@@ -10,11 +10,63 @@ import { useFetch } from "../hooks/useFetch";
 import { type Project, type Stats } from "../types";
 import { formatKES, isFunded } from "../utils/format";
 import { projectPath } from "../utils/paths";
+import {useMemo, useState} from "react";
 
 const Monitoring = () => {
   const stats = useFetch<Stats>("/stats");
   const projects = useFetch<Project[]>("/projects");
   const funded = projects.data?.filter((project) => isFunded(project.status)) ?? [];
+
+  
+type SortColumn = "budget" | "spent" | "progress";
+type SortDirection = "asc" | "desc";
+
+const [sortBy, setSortBy] = useState<SortColumn>("budget");
+const [direction, setDirection] = useState<SortDirection>("desc");
+
+const sortedFunded = useMemo(() => {
+  return [...funded].sort((a, b) => {
+    const aValue =
+      sortBy === "budget"
+        ? a.budget
+        : sortBy === "spent"
+          ? a.spent
+          : a.progress;
+
+    const bValue =
+      sortBy === "budget"
+        ? b.budget
+        : sortBy === "spent"
+          ? b.spent
+          : b.progress;
+
+    return direction === "asc"
+      ? Number(aValue ?? 0) - Number(bValue ?? 0)
+      : Number(bValue ?? 0) - Number(aValue ?? 0);
+  });
+}, [funded, sortBy, direction]);
+
+const handleSort = (column: SortColumn) => {
+  if (sortBy === column) {
+    setDirection((current) => current === "asc" ? "desc" : "asc");
+  } else {
+    setSortBy(column);
+    setDirection("desc");
+  }
+};
+
+const sortLabel = (column: SortColumn) => {
+  if (sortBy !== column) return "";
+  return direction === "asc" ? " ↑" : " ↓";
+};
+
+const sortAria = (
+  column: SortColumn,
+): "ascending" | "descending" | "none" => {
+  if (sortBy !== column) return "none";
+  return direction === "asc" ? "ascending" : "descending";
+};
+
 
   return (
     <div className="flex flex-col gap-14">
@@ -44,20 +96,23 @@ const Monitoring = () => {
         ) : !projects.data ? (
           <Loader label="Loading projects" />
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-line bg-white">
+          <div className="overflow-x-auto rounded-xl border border-line bg-surface">
             <table className="w-full min-w-[720px] text-left">
               <thead className="border-b border-line text-sm text-muted">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Project</th>
                   <th className="px-4 py-3 font-semibold">Ward</th>
                   <th className="px-4 py-3 font-semibold">Stage</th>
-                  <th className="px-4 py-3 text-right font-semibold">Budget</th>
-                  <th className="px-4 py-3 text-right font-semibold">Spent</th>
-                  <th className="w-44 px-4 py-3 font-semibold">Built</th>
+                  <th aria-sort={sortAria("budget")}className="px-4 py-3 text-right font-semibold">
+                    <button type="button" onClick={() => handleSort("budget")} className="hover:text-tea">Budget{sortLabel("budget")} </button> </th>
+                  <th aria-sort={sortAria("spent")} className="px-4 py-3 text-right font-semibold">
+                    <button type="button" onClick={() => handleSort("spent")} className="hover:text-tea">Spent{sortLabel("spent")}</button> </th>
+                  <th aria-sort={sortAria("progress")} className="w-44 px-4 py-3 font-semibold">
+                    <button type="button" onClick={() => handleSort("progress")} className="hover:text-tea">Built {sortLabel("progress")}</button> </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {funded.map((project) => (
+                {sortedFunded.map((project) => (
                   <tr key={project.id}>
                     <td className="px-4 py-3">
                       <Link to={projectPath(project)} className="font-semibold hover:text-tea hover:underline">

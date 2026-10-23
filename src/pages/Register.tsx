@@ -1,112 +1,302 @@
-import { useState, type ChangeEvent, type SubmitEvent } from "react";
+
+import { useEffect, useReducer, useRef, type ChangeEvent, type SubmitEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import AuthLayout from "../components/auth/AuthLayout";
 import ErrorMessage from "../components/shared/ui/ErrorMessage";
-import InputField from "../components/shared/ui/InputField";
+import InputField, {type InputFieldHandle,} from "../components/shared/ui/InputField";
 import PrimaryButton from "../components/shared/ui/PrimaryButton";
 import { useAuth } from "../hooks/useAuth";
 import { type CurrUserType } from "../types";
 import { api } from "../utils/api";
-
-/**
- * Forms with multiple inputs
- *
- * 1. Keep every input in ONE state object instead of one useState per input.
- * 2. Give each input a `name` that matches a key in that object.
- * 3. Use ONE handleChange for all inputs: e.target.name tells us which key to update.
- * 4. On submit, call e.preventDefault() (stops the page reload) and send the whole object to the API.
- *
- * The other forms in this project use the same idea through the useForm hook (hooks/useForm.ts).
- */
-
-// Lesson aid: shows the form state under the form as you type. Set to false to hide it.
-const SHOW_FORM_STATE = true;
 
 type RegisterForm = {
   name: string;
   email: string;
   phone: string;
   password: string;
+  confirmPassword: string;
 };
 
-const emptyForm: RegisterForm = { name: "", email: "", phone: "", password: "" };
+type RegisterErrors = Partial<
+  Record<"phone" | "password" | "confirmPassword", string>
+>;
+
+type RegisterState = {
+  form: RegisterForm;
+  fieldErrors: RegisterErrors;
+  code: string;
+  devCode: string;
+  step: "details" | "code";
+  loading: boolean;
+  error: string;
+};
+
+type RegisterAction =
+  | { type: "formEdited"; name: string; value: string }
+  | { type: "validationFailed"; errors: RegisterErrors }
+  | { type: "codeChanged"; code: string }
+  | { type: "codeSent"; devCode: string }
+  | { type: "requestStarted" }
+  | { type: "requestFailed"; error: string }
+  | { type: "requestFinished" }
+  | { type: "backToDetails" }
+  | { type: "clearError" };
+
+const initialState: RegisterState = {
+  form: {
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+  },
+  fieldErrors: {},
+  code: "",
+  devCode: "",
+  step: "details",
+  loading: false,
+  error: "",
+};
+
+function registerReducer(
+  state: RegisterState,
+  action: RegisterAction,
+): RegisterState {
+  switch (action.type) {
+    case "formEdited": {
+      const fieldErrors = { ...state.fieldErrors };
+
+      if (action.name in fieldErrors) {
+        delete fieldErrors[action.name as keyof RegisterErrors];
+      }
+
+      if (action.name === "password") {
+        delete fieldErrors.password;
+        delete fieldErrors.confirmPassword;
+      }
+
+      return {
+        ...state,
+        form: {
+          ...state.form,
+          [action.name]: action.value,
+        },
+        fieldErrors,
+        error: "",
+      };
+    }
+
+    case "validationFailed":
+      return {
+        ...state,
+        fieldErrors: action.errors,
+      };
+
+    case "codeChanged":
+      return {
+        ...state,
+        code: action.code,
+        error: "",
+      };
+
+    case "codeSent":
+      return {
+        ...state,
+        devCode: action.devCode,
+        step: "code",
+        loading: false,
+        error: "",
+      };
+
+    case "requestStarted":
+      return {
+        ...state,
+        loading: true,
+        error: "",
+      };
+
+    case "requestFailed":
+      return {
+        ...state,
+        loading: false,
+        error: action.error,
+      };
+
+    case "requestFinished":
+      return {
+        ...state,
+        loading: false,
+      };
+
+    case "backToDetails":
+      return {
+        ...state,
+        step: "details",
+        error: "",
+        loading: false,
+      };
+
+    case "clearError":
+      return {
+        ...state,
+        error: "",
+      };
+
+    default:
+      return state;
+  }
+}
+
+function validate(form: RegisterForm): RegisterErrors {
+  const errors: RegisterErrors = {};
+
+  if (!/^0[17]\d{8}$/.test(form.phone)) {
+    errors.phone = "Use 10 digits starting with 07 or 01";
+  }
+
+  if (form.password.length < 8) {
+    errors.password = "Password must be at least 8 characters";
+  }
+
+  if (form.confirmPassword !== form.password) {
+    errors.confirmPassword = "Passwords do not match";
+  }
+
+  return errors;
+}
+
+// Set to false when you no longer need to inspect form state.
+const SHOW_FORM_STATE = false;
 
 const Register = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? "/";
+  const from =
+    (location.state as { from?: string } | null)?.from ?? "/";
 
-  const [form, setForm] = useState<RegisterForm>(emptyForm);
-  const [code, setCode] = useState("");
-  const [devCode, setDevCode] = useState("");
-  const [step, setStep] = useState<"details" | "code">("details");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [state, dispatch] = useReducer(registerReducer, initialState);
 
-  // One handler for every input. [name] is a "computed key": if name is "email",
-  // this becomes { ...prev, email: value }
+  const phoneRef = useRef<InputFieldHandle>(null);
+  const passwordRef = useRef<InputFieldHandle>(null);
+  const confirmPasswordRef = useRef<InputFieldHandle>(null);
+  const codeRef = useRef<InputFieldHandle>(null);
+
+  const { form, fieldErrors, code, devCode, step, loading, error } = state;
+
+  // Focus the SMS input when the code step appears.
+  useEffect(() => {
+    if (step === "code") {
+      codeRef.current?.focus();
+    }
+  }, [step]);
+
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+
+    dispatch({ type: "formEdited", name, value });
   };
 
-  // Step 1: send all four fields to the API in one request
   const handleRegister = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+
+    const validationErrors = validate(form);
+    dispatch({ type: "validationFailed", errors: validationErrors });
+
+    // Focus the first invalid field.
+    if (validationErrors.phone) {
+      phoneRef.current?.focus();
+      return;
+    }
+
+    if (validationErrors.password) {
+      passwordRef.current?.focus();
+      return;
+    }
+
+    if (validationErrors.confirmPassword) {
+      confirmPasswordRef.current?.focus();
+      return;
+    }
+
+    dispatch({ type: "requestStarted" });
+
     try {
-      const res = await api<{ message: string; phone: string; devCode: string }>("/auth/register", {
+      const res = await api<{
+        message: string;
+        phone: string;
+        devCode: string;
+      }>("/auth/register", {
         method: "POST",
-        body: form,
+        body: {
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          password: form.password,
+        },
       });
-      setDevCode(res.devCode);
-      setStep("code");
+
+      dispatch({ type: "codeSent", devCode: res.devCode });
     } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
+      dispatch({
+        type: "requestFailed",
+        error: (err as Error).message,
+      });
     }
   };
 
-  // Step 2: confirm the SMS code. The API logs the user in and returns a token
   const handleVerify = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    dispatch({ type: "requestStarted" });
+
     try {
       const loggedInUser = await api<CurrUserType>("/auth/verify", {
         method: "POST",
         body: { phone: form.phone, code },
       });
+
       signIn(loggedInUser);
       navigate(from, { replace: true });
     } catch (err) {
-      setError((err as Error).message);
-      setLoading(false);
+      dispatch({
+        type: "requestFailed",
+        error: (err as Error).message,
+      });
     }
   };
 
   if (step === "code") {
     return (
-      <AuthLayout title="Confirm your phone" intro={`We sent a 4-digit code to ${form.phone}.`}>
+      <AuthLayout
+        title="Confirm your phone"
+        intro={`We sent a 4-digit code to ${form.phone}.`}
+      >
         <form onSubmit={handleVerify} className="flex flex-col gap-5">
           <InputField
+            ref={codeRef}
             label="SMS code"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={(e) =>
+              dispatch({ type: "codeChanged", code: e.target.value })
+            }
             inputMode="numeric"
             autoComplete="one-time-code"
             maxLength={4}
             hint={`Practice API code: ${devCode}`}
             required
           />
+
           {error && <ErrorMessage message={error} />}
-          <PrimaryButton type="submit" title={loading ? "Checking..." : "Verify"} disabled={loading} />
+
+          <PrimaryButton
+            type="submit"
+            title={loading ? "Checking..." : "Verify"}
+            disabled={loading}
+          />
+
           <button
             type="button"
-            onClick={() => setStep("details")}
+            onClick={() => dispatch({ type: "backToDetails" })}
             className="text-sm font-semibold text-tea hover:underline"
           >
             Change my details
@@ -123,7 +313,11 @@ const Register = () => {
       footer={
         <p>
           Already registered?{" "}
-          <Link to="/login" state={location.state} className="font-semibold text-tea underline underline-offset-4">
+          <Link
+            to="/login"
+            state={location.state}
+            className="font-semibold text-tea underline underline-offset-4"
+          >
             Log in
           </Link>
         </p>
@@ -138,6 +332,7 @@ const Register = () => {
           autoComplete="name"
           required
         />
+
         <InputField
           label="Email"
           name="email"
@@ -147,32 +342,56 @@ const Register = () => {
           autoComplete="email"
           required
         />
+
         <InputField
+          ref={phoneRef}
           label="Phone"
           name="phone"
           type="tel"
           value={form.phone}
           onChange={handleChange}
           autoComplete="tel"
-          placeholder="0712345678"
+          placeholder="Eg 07.../ 01..."
+          error={fieldErrors.phone}
           required
         />
+
         <InputField
+          ref={passwordRef}
           label="Password"
           name="password"
           type="password"
           value={form.password}
           onChange={handleChange}
           autoComplete="new-password"
+          error={fieldErrors.password}
+          required
+        />
+
+        <InputField
+          ref={confirmPasswordRef}
+          label="Confirm password"
+          name="confirmPassword"
+          type="password"
+          value={form.confirmPassword}
+          onChange={handleChange}
+          autoComplete="new-password"
+          error={fieldErrors.confirmPassword}
           required
         />
 
         {error && <ErrorMessage message={error} />}
 
-        <PrimaryButton type="submit" title={loading ? "Creating account..." : "Register"} disabled={loading} />
+        <PrimaryButton
+          type="submit"
+          title={loading ? "Creating account..." : "Register"}
+          disabled={loading}
+        />
 
         {SHOW_FORM_STATE && (
-          <pre className="overflow-x-auto rounded-md bg-paper p-3 text-sm">{JSON.stringify(form, null, 2)}</pre>
+          <pre className="overflow-x-auto rounded-md bg-paper p-3 text-sm">
+            {JSON.stringify(form, null, 2)}
+          </pre>
         )}
       </form>
     </AuthLayout>

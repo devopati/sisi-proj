@@ -11,7 +11,7 @@ const baseClass =
   "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60";
 
 const VoteButtons = ({ projectId, initialVotes }: VoteButtonsProps) => {
-  const { votes, myVote, sending, error, vote } = useVote(projectId, initialVotes);
+  const { votes, myVote, sending, error, pending, vote } = useVote(projectId, initialVotes);
 
   return (
     <div className="flex flex-col gap-2">
@@ -46,7 +46,12 @@ const VoteButtons = ({ projectId, initialVotes }: VoteButtonsProps) => {
           You voted to {myVote}. Click the other button to change your vote.
         </p>
       )}
-      {error && <p className="text-sm text-murram">{error}</p>}
+      {pending && (
+        <p role="status" className="text-sm text-muted">
+          Your vote is saved on this device and will send when you're back online. 
+        </p>
+      )}
+      {error && !pending && (<p role="alert" className="text-sm text-murram">{error}</p>)}
     </div>
   );
 };

@@ -1,3 +1,4 @@
+
 /**
  * useEffect Hook
  */
@@ -259,9 +260,14 @@ import ProposeProject from "./pages/ProposeProject";
 import Register from "./pages/Register";
 import WardDetails from "./pages/WardDetails";
 import Wards from "./pages/Wards";
+import MyProposals from "./pages/MyProposals";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { ToastProvider } from "./contexts/ToastContext";
 
 const App = () => {
   return (
+    <ThemeProvider>
+    <ToastProvider>
     <Routes>
       <Route element={<CommonLayout />}>
         <Route index element={<Home />} />
@@ -279,6 +285,14 @@ const App = () => {
             </RequireAuth>
           }
         />
+        <Route
+          path="my-proposals"
+          element={
+            <RequireAuth>
+              <MyProposals />
+            </RequireAuth>
+          }
+        />
         <Route path="projects/monitoring" element={<Monitoring />} />
         <Route path="projects/:id/:slug?" element={<ProjectDetails />} />
 
@@ -288,10 +302,13 @@ const App = () => {
         <Route path="participate" element={<Participate />} />
         <Route path="about" element={<AboutUs />} />
         <Route path="contact" element={<ContactUs />} />
+        
 
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
+  </ToastProvider>
+</ThemeProvider>
   );
 };
 

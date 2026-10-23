@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useDebugValue, useEffect, useState } from "react";
 import { api } from "../utils/api";
 
 /**
@@ -15,6 +15,10 @@ export const useFetch = <T>(path: string | null) => {
 
   // Each path + reload gets its own name, so we can tell when the response we hold is out of date
   const request = `${path} #${reloadCount}`;
+
+  const refetch = useCallback(() => {
+    setReloadCount((count) => count + 1);
+  }, []);
 
   useEffect(() => {
     if (!path) return;
@@ -33,10 +37,13 @@ export const useFetch = <T>(path: string | null) => {
     };
   }, [path, request]);
 
-  return {
-    data: response?.data ?? null,
-    error: response?.request === request ? response.error : "",
-    loading: response?.request !== request,
-    refetch: () => setReloadCount((count) => count + 1),
-  };
+
+  const data = response?.data ?? null;
+  const error = response?.request === request ? response.error : "";
+  const loading = response?.request !== request;
+
+  useDebugValue(!path ? "Fetch: waiting" : loading ? `Fetch: "${path}" loading` : error ? `Fetch: error ${error}` : "Fetch: loaded");
+  return { data, error, loading, refetch, };
+
 };
+

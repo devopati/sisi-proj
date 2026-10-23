@@ -47,7 +47,12 @@ self.addEventListener("install", (event) => {
       await cache.addAll([...APP_SHELL, ...builtFiles]);
 
       // Take over now, instead of waiting for every open tab to close
-      await self.skipWaiting();
+      //await self.skipWaiting();
+      self.addEventListener("message", (event) => {
+        if (event.data === "skipWaiting") {
+          self.skipWaiting();
+        }
+      });
     })(),
   );
 });
