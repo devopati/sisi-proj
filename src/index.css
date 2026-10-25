@@ -1,14 +1,12 @@
 @import "tailwindcss";
 
-/* Colours come from the county itself: tea fields, murram roads, maize and the lake */
-@theme {
-  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
-
+:root {
   --color-paper: #f5f7f4;
   --color-ink: #1c2620;
   --color-muted: #5a665f;
   --color-line: #dae1db;
-
+  --color-surface: #ffffff;
+  --color-surface-alt: #f4f7f5;
   --color-tea: #1f5c3a;
   --color-tea-dark: #143d26;
   --color-tea-light: #e3efe6;
@@ -16,6 +14,43 @@
   --color-maize: #d99a1b;
   --color-maize-dark: #7a5208;
   --color-lake: #2d6797;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-paper: #101814;
+  --color-ink: #edf6f0;
+  --color-muted: #a9b7b0;
+  --color-line: #2d3d37;
+  --color-surface: #16231d;
+  --color-surface-alt: #1d312a;
+  --color-tea: #7fc7a0;
+  --color-tea-dark: #bfe4cf;
+  --color-tea-light: rgba(127, 199, 160, 0.14);
+  --color-murram: #e08d5d;
+  --color-maize: #f0c660;
+  --color-maize-dark: #f5dd96;
+  --color-lake: #8bbce8;
+}
+
+/* Colours come from the county itself: tea fields, murram roads, maize and the lake */
+@theme {
+  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+
+  --color-paper: var(--color-paper);
+  --color-ink: var(--color-ink);
+  --color-muted: var(--color-muted);
+  --color-line: var(--color-line);
+  --color-surface: var(--color-surface);
+  --color-surface-alt: var(--color-surface-alt);
+
+  --color-tea: var(--color-tea);
+  --color-tea-dark: var(--color-tea-dark);
+  --color-tea-light: var(--color-tea-light);
+  --color-murram: var(--color-murram);
+  --color-maize: var(--color-maize);
+  --color-maize-dark: var(--color-maize-dark);
+  --color-lake: var(--color-lake);
 }
 
 /* Wide, heavy Archivo for headings, like the lettering on a road sign */
@@ -33,6 +68,33 @@
 
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-tea;
+  }
+
+  html[data-theme="dark"] .bg-white,
+  html[data-theme="dark"] .bg-paper,
+  html[data-theme="dark"] .bg-tea-light,
+  html[data-theme="dark"] .bg-slate-50,
+  html[data-theme="dark"] .bg-gray-50,
+  html[data-theme="dark"] .bg-lake/12,
+  html[data-theme="dark"] .bg-maize/20,
+  html[data-theme="dark"] .bg-murram/12 {
+    background-color: var(--color-surface) !important;
+  }
+
+  html[data-theme="dark"] .text-ink {
+    color: var(--color-ink) !important;
+  }
+
+  html[data-theme="dark"] .text-muted {
+    color: var(--color-muted) !important;
+  }
+
+  html[data-theme="dark"] .border-line {
+    border-color: var(--color-line) !important;
+  }
+
+  html[data-theme="dark"] .bg-tea-light {
+    background-color: var(--color-tea-light) !important;
   }
 }
 
