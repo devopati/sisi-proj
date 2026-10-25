@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router";
 import FeedbackSection from "../components/projects/FeedbackSection";
 import MilestoneList from "../components/projects/MilestoneList";
@@ -11,7 +11,7 @@ import ProgressBar from "../components/shared/ui/ProgressBar";
 import StatusPill from "../components/shared/ui/StatusPill";
 import { useFetch } from "../hooks/useFetch";
 import { type Project } from "../types";
-import { formatDate, formatKES, isFunded } from "../utils/format";
+import { formatDate, formatDaysLeft, formatKES, isFunded } from "../utils/format";
 import { projectPath } from "../utils/paths";
 
 // Route: /projects/:id/:slug  (only the id is sent to the API)
@@ -20,6 +20,7 @@ const ProjectDetails = () => {
   const location = useLocation();
   const { data: project, loading, error, refetch } = useFetch<Project>(`/projects/${id}`);
   const justProposed = (location.state as { justProposed?: boolean } | null)?.justProposed;
+  const [copied, setCopied] = useState(false);
 
   // "Feedback" links on project cards point to #feedback. Scroll there once the page has loaded.
   useEffect(() => {
@@ -27,6 +28,12 @@ const ProjectDetails = () => {
       document.getElementById("feedback")?.scrollIntoView();
     }
   }, [project, location.hash]);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timeout = window.setTimeout(() => setCopied(false), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [copied]);
 
   if (loading) return <Loader label="Loading project" />;
 
@@ -44,12 +51,27 @@ const ProjectDetails = () => {
   if (slug !== project.slug) return <Navigate to={projectPath(project) + location.hash} replace />;
 
   const funded = isFunded(project.status);
+  const deadlineText = formatDaysLeft(project.endDate, project.status);
+
+  const copyLink = async () => {
+    await navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+  };
 
   return (
     <div className="flex flex-col gap-10">
-      <Link to="/projects" className="self-start font-semibold text-tea underline-offset-4 hover:underline">
-        Back to all projects
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link to="/projects" className="self-start font-semibold text-tea underline-offset-4 hover:underline">
+          Back to all projects
+        </Link>
+        <button
+          type="button"
+          onClick={copyLink}
+          className="rounded-lg border border-tea px-3 py-2 text-sm font-semibold text-tea hover:bg-tea-light"
+        >
+          {copied ? "Copied" : "Copy link"}
+        </button>
+      </div>
 
       {justProposed && (
         <p role="status" className="rounded-lg bg-tea-light px-5 py-4 text-tea-dark">
@@ -131,6 +153,9 @@ const ProjectDetails = () => {
                   <p className="text-sm font-semibold">{project.progress}% built</p>
                   <ProgressBar value={project.progress} size="lg" label={`${project.progress}% built`} />
                 </div>
+                {deadlineText && (
+                  <p className="text-sm font-semibold text-tea-dark">{deadlineText}</p>
+                )}
               </>
             ) : (
               <>
