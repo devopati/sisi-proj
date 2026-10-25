@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router";
 import { type Votes, type VoteResult } from "../types";
 import { api } from "../utils/api";
 import { useAuth } from "./useAuth";
+import { useLocalStorage } from "./useLocalStorage";
 
 type Choice = "support" | "reject";
 
@@ -11,15 +12,16 @@ export const useVote = (projectId: number, initialVotes: Votes) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const storageKey = user ? `vote-${user.id}-${projectId}` : `vote-guest-${projectId}`;
   const [votes, setVotes] = useState(initialVotes);
-  const [myVote, setMyVote] = useState<Choice | null>(null);
+  const [myVote, setMyVote] = useLocalStorage<Choice | null>(storageKey, null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
 
   const vote = async (choice: Choice) => {
     if (!user) {
       navigate("/login", { state: { from: location.pathname } });
-      return;
+      return false;
     }
     setSending(true);
     setError("");
@@ -31,8 +33,10 @@ export const useVote = (projectId: number, initialVotes: Votes) => {
       });
       setVotes(result.votes);
       setMyVote(result.myVote);
+      return true;
     } catch (err) {
       setError((err as Error).message);
+      return false;
     } finally {
       setSending(false);
     }
