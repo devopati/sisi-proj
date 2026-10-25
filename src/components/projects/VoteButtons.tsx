@@ -1,4 +1,5 @@
 import { useVote } from "../../hooks/useVote";
+import { useToast } from "../../hooks/toastContext";
 import { type Votes } from "../../types";
 import { formatNumber } from "../../utils/format";
 
@@ -12,13 +13,19 @@ const baseClass =
 
 const VoteButtons = ({ projectId, initialVotes }: VoteButtonsProps) => {
   const { votes, myVote, sending, error, vote } = useVote(projectId, initialVotes);
+  const { showToast } = useToast();
+
+  const handleVote = async (choice: "support" | "reject") => {
+    const didVote = await vote(choice);
+    if (didVote) showToast("Vote recorded");
+  };
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => vote("support")}
+          onClick={() => handleVote("support")}
           disabled={sending}
           aria-pressed={myVote === "support"}
           className={`${baseClass} ${
@@ -29,7 +36,7 @@ const VoteButtons = ({ projectId, initialVotes }: VoteButtonsProps) => {
         </button>
         <button
           type="button"
-          onClick={() => vote("reject")}
+          onClick={() => handleVote("reject")}
           disabled={sending}
           aria-pressed={myVote === "reject"}
           className={`${baseClass} ${
