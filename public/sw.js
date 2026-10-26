@@ -15,7 +15,7 @@
 
 // Change VERSION whenever you edit this file or the files in APP_SHELL.
 // The browser then installs the new worker and deletes the old caches.
-const VERSION = "v1";
+const VERSION = "v3";
 const APP_CACHE = `sisi-app-${VERSION}`; // HTML, JS, CSS, icons, fonts
 const DATA_CACHE = `sisi-data-${VERSION}`; // answers from the SISI API
 
@@ -46,10 +46,29 @@ self.addEventListener("install", (event) => {
 
       await cache.addAll([...APP_SHELL, ...builtFiles]);
 
-      // Take over now, instead of waiting for every open tab to close
-      await self.skipWaiting();
+      // Seed the commonly used project and ward lists for a first offline visit.
+      const dataCache = await caches.open(DATA_CACHE);
+      await Promise.all(
+        ["/api/projects", "/api/wards"].map(async (path) => {
+          try {
+            const response = await fetch(path);
+            if (response.ok) await dataCache.put(path, response.clone());
+          } catch (error) {
+            console.warn(`Could not pre-cache ${path}:`, error);
+          }
+        }),
+      );
+      console.info(`SISI service worker ${VERSION} installed and waiting for confirmation.`);
     })(),
   );
+});
+
+// A waiting update takes over only after the user confirms the refresh.
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    console.info(`SISI service worker ${VERSION} received the update confirmation.`);
+    self.skipWaiting();
+  }
 });
 
 // ---------- 2. activate: delete caches from older versions ----------
@@ -58,13 +77,12 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       const names = await caches.keys();
-      const oldNames = names.filter(
-        (name) => name !== APP_CACHE && name !== DATA_CACHE,
-      );
+      const oldNames = names.filter((name) => name !== APP_CACHE && name !== DATA_CACHE);
       await Promise.all(oldNames.map((name) => caches.delete(name)));
 
       // Start controlling tabs that are already open
       await self.clients.claim();
+      console.info(`SISI service worker ${VERSION} activated.`);
     })(),
   );
 });
