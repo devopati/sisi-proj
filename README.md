@@ -18,13 +18,44 @@ The API keeps everything in memory, so restarting it resets all the data and log
 
 ## Install it as an app
 
-SISI is a progressive web app: it can be installed, and pages you've opened still work offline. The service worker only runs in the production build:
+SISI is a progressive web app: it can be installed, and cached pages and data still work offline. The service worker only runs in the production build:
 
 ```bash
 npm run pwa   # build, then serve it → http://localhost:4173
 ```
 
 In Chrome or Edge, click **Install app** in the header. The worker is [public/sw.js](public/sw.js) and the app details are in [public/manifest.webmanifest](public/manifest.webmanifest).
+
+### Caching strategy
+
+| Request | Strategy | Offline behavior |
+| --- | --- | --- |
+| App shell, built JS/CSS, icons and fonts | Cache first | Uses the installed app shell and previously downloaded files. |
+| Page navigation | Network first | Uses the cached home page as the single-page-app fallback. |
+| `GET /api/projects` and `GET /api/wards` | Network first; the two lists are also seeded during service-worker install | Shows the latest response when online and a saved response when offline. Other API GETs are saved after you visit them. |
+| `/api/auth/*` and other form submissions | Network only | Login, registration, feedback, proposals and other POSTs need a connection. |
+| Project votes | Network when online; queued in local storage when offline | Queued votes are sent when the browser reports it is online again. |
+| External content such as the contact-page map | Browser/network | Not cached by the service worker. |
+
+### Offline behavior and limitations
+
+- The app shell, projects list and wards list are pre-cached; other GET data is available offline only after it has been fetched successfully at least once.
+- The worker uses network-first for project and ward data, so offline users see the last successful cached response, which may be stale.
+- Votes made offline are stored per user in this browser and retried when the browser reports an online connection. They are not encrypted or shared across devices.
+- Queued votes need the same account to be signed in and the API to accept them before they are removed. Failed attempts stay queued for another online event.
+- Authentication, registration, feedback, proposals, contact forms and other POST requests require a connection. External content such as the map is not cached.
+
+This is a learning implementation, not durable transaction storage: local storage can be cleared, is not encrypted, and does not provide Background Sync guarantees. Do not use this queue for sensitive or high-value actions.
+
+The app requests the API through the same-origin `/api` path so the service worker can cache GET responses. Vite proxies this path to the local practice API on port 4000 for both development and preview. In production, configure the hosting platform or a reverse proxy to route the app's same-origin `/api` requests to the API; pointing `VITE_API_URL` at a separate origin bypasses service-worker caching.
+
+### Service worker lifecycle and updates
+
+The first worker installs the app shell and activates immediately because there is no older version controlling the page. On a later release, the new worker installs its shell and data caches but waits while the current worker controls open pages. The header then shows **A new version is ready. Update now**. Selecting the button sends `SKIP_WAITING` to the waiting worker; it activates, removes old versioned caches, claims the open clients and the page reloads under the new worker. The service-worker console logs the install, confirmation and activation steps.
+
+Change `VERSION` in [public/sw.js](public/sw.js) for each release (the current worker is `v3`). To verify an update, install and load one version, change the version and rebuild, then reload the app and confirm the waiting prompt appears before choosing **Update now**. Capture the waiting state and the page after activation in browser DevTools when preparing assignment evidence.
+
+The app also includes a persistent dark-mode switch and dismissible toast messages as additional participation and accessibility improvements.
 
 ## Pages
 
@@ -86,4 +117,4 @@ Colours come from the county itself: tea green (`tea`), murram-road red (`murram
 
 The API's `image` fields hold random placeholder photos, so the app draws topographic covers instead ([Contours.tsx](src/components/shared/ui/Contours.tsx)). Once you have real photos, swap them back in with `<img src={project.image} />`.
 
-If the API runs on another address, create `.env.local` with `VITE_API_URL=http://your-host:4000/api`.
+For local development and `npm run pwa`, `/api` is proxied to `http://localhost:4000`. In a deployment, keep the API on the app's origin with a hosting-platform or reverse-proxy rule; a cross-origin `VITE_API_URL` will work for online API calls but cannot be intercepted or cached by this app's service worker.
