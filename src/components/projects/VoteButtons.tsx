@@ -1,4 +1,5 @@
 import { useVote } from "../../hooks/useVote";
+import { useToast } from "../../hooks/toastContext";
 import { type Votes } from "../../types";
 import { formatNumber } from "../../utils/format";
 
@@ -11,14 +12,21 @@ const baseClass =
   "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60";
 
 const VoteButtons = ({ projectId, initialVotes }: VoteButtonsProps) => {
-  const { votes, myVote, sending, error, vote } = useVote(projectId, initialVotes);
+  const { votes, myVote, sending, error, queued, vote } = useVote(projectId, initialVotes);
+  const { showToast } = useToast();
+
+  const handleVote = async (choice: "support" | "reject") => {
+    const didVote = await vote(choice);
+    if (didVote === "sent") showToast("Vote recorded");
+    if (didVote === "queued") showToast("Will send when you're back online");
+  };
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => vote("support")}
+          onClick={() => handleVote("support")}
           disabled={sending}
           aria-pressed={myVote === "support"}
           className={`${baseClass} ${
@@ -29,7 +37,7 @@ const VoteButtons = ({ projectId, initialVotes }: VoteButtonsProps) => {
         </button>
         <button
           type="button"
-          onClick={() => vote("reject")}
+          onClick={() => handleVote("reject")}
           disabled={sending}
           aria-pressed={myVote === "reject"}
           className={`${baseClass} ${
@@ -46,6 +54,7 @@ const VoteButtons = ({ projectId, initialVotes }: VoteButtonsProps) => {
           You voted to {myVote}. Click the other button to change your vote.
         </p>
       )}
+      {queued && <p role="status" className="text-sm text-maize-dark">Will send when you're back online.</p>}
       {error && <p className="text-sm text-murram">{error}</p>}
     </div>
   );

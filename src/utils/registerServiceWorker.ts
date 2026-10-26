@@ -10,8 +10,8 @@ export const registerServiceWorker = () => {
 
   // Wait until the page has loaded, so registering doesn't slow it down
   window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/sw.js")
-      .catch((error) => console.error("Service worker registration failed:", error));
+    void navigator.serviceWorker.register("/sw.js").catch((error) => {
+      console.error("Service worker registration failed:", error);
+    });
   });
 };

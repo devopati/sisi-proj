@@ -1,4 +1,4 @@
-import { useState, type SubmitEvent } from "react";
+import { useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import MoneySummary from "../components/projects/MoneySummary";
 import ProjectCard from "../components/projects/ProjectCard";
@@ -14,6 +14,7 @@ import TextAreaField from "../components/shared/ui/TextAreaField";
 import { useAuth } from "../hooks/useAuth";
 import { useFetch } from "../hooks/useFetch";
 import { useForm } from "../hooks/useForm";
+import { useToast } from "../hooks/toastContext";
 import { type Feedback, type Project, type Stats } from "../types";
 import { api } from "../utils/api";
 import { projectPath } from "../utils/paths";
@@ -83,6 +84,7 @@ const FeedbackTab = () => {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [postedOn, setPostedOn] = useState<Project | null>(null);
+  const { showToast } = useToast();
 
   const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -96,6 +98,7 @@ const FeedbackTab = () => {
       });
       setPostedOn(projects?.find((project) => project.id === Number(values.projectId)) ?? null);
       setValues((prev) => ({ ...prev, message: "" }));
+      showToast("Feedback posted");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -171,6 +174,47 @@ const Participate = () => {
   // The open tab lives in the URL (?tab=money) so other pages can link straight to it
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = tabs.some((tab) => tab.id === searchParams.get("tab")) ? searchParams.get("tab") : "vote";
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const current = tabs[index];
+    const lastIndex = tabs.length - 1;
+
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      event.preventDefault();
+      const nextIndex = (index + 1) % tabs.length;
+      tabRefs.current[nextIndex]?.focus();
+      setSearchParams({ tab: tabs[nextIndex].id }, { replace: true });
+      return;
+    }
+
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const previousIndex = (index - 1 + tabs.length) % tabs.length;
+      tabRefs.current[previousIndex]?.focus();
+      setSearchParams({ tab: tabs[previousIndex].id }, { replace: true });
+      return;
+    }
+
+    if (event.key === "Home") {
+      event.preventDefault();
+      tabRefs.current[0]?.focus();
+      setSearchParams({ tab: tabs[0].id }, { replace: true });
+      return;
+    }
+
+    if (event.key === "End") {
+      event.preventDefault();
+      tabRefs.current[lastIndex]?.focus();
+      setSearchParams({ tab: tabs[lastIndex].id }, { replace: true });
+      return;
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setSearchParams({ tab: current.id }, { replace: true });
+    }
+  };
 
   return (
     <div className="flex flex-col gap-10">
@@ -180,14 +224,19 @@ const Participate = () => {
       />
 
       <div role="tablist" aria-label="Ways to take part" className="flex flex-wrap gap-2 border-b border-line">
-        {tabs.map((tab) => (
+        {tabs.map((tab, index) => (
           <button
+            ref={(node) => {
+              tabRefs.current[index] = node;
+            }}
             key={tab.id}
             type="button"
             role="tab"
             id={`tab-${tab.id}`}
+            tabIndex={activeTab === tab.id ? 0 : -1}
             aria-selected={activeTab === tab.id}
             aria-controls="participate-panel"
+            onKeyDown={(event) => handleTabKeyDown(event, index)}
             onClick={() => setSearchParams({ tab: tab.id }, { replace: true })}
             className={`-mb-px border-b-2 px-4 py-3 font-semibold transition ${
               activeTab === tab.id ? "border-tea text-tea" : "border-transparent text-muted hover:text-ink"
@@ -198,7 +247,7 @@ const Participate = () => {
         ))}
       </div>
 
-      <div role="tabpanel" id="participate-panel" aria-labelledby={`tab-${activeTab}`}>
+      <div tabIndex={0} role="tabpanel" id="participate-panel" aria-labelledby={`tab-${activeTab}`}>
         {activeTab === "vote" && <VoteTab />}
         {activeTab === "money" && <MoneyTab />}
         {activeTab === "feedback" && <FeedbackTab />}

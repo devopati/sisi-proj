@@ -2,6 +2,9 @@ import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router";
 import { useAuth } from "../../../hooks/useAuth";
 import { useInstallPrompt } from "../../../hooks/useInstallPrompt";
+import { useServiceWorkerUpdate } from "../../../hooks/useServiceWorkerUpdate";
+import { useTheme } from "../../../hooks/themeContext";
+import { useToast } from "../../../hooks/toastContext";
 import LinkButton from "../ui/LinkButton";
 import OfflineBanner from "./OfflineBanner";
 
@@ -19,6 +22,9 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 const Header = () => {
   const { user, signOut } = useAuth();
   const { canInstall, install } = useInstallPrompt();
+  const { updateReady, applyUpdate } = useServiceWorkerUpdate();
+  const { theme, setTheme } = useTheme();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -27,10 +33,12 @@ const Header = () => {
   const handleLogOut = () => {
     signOut();
     closeMenu();
+    showToast("Logged out");
     navigate("/");
   };
 
-  // Only shown when the browser says SISI can be installed
+  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
+
   const installButton = canInstall && (
     <button
       type="button"
@@ -43,6 +51,9 @@ const Header = () => {
 
   const authLinks = user ? (
     <>
+      <NavLink to="/my-proposals" onClick={closeMenu} className={navClass}>
+        My proposals
+      </NavLink>
       <span className="text-sm text-muted lg:hidden xl:inline">
         Logged in as <strong className="text-ink">{user.name}</strong>
       </span>
@@ -77,6 +88,14 @@ const Header = () => {
 
         <div className="hidden items-center gap-2 lg:flex">
           {installButton}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="rounded-md border border-line px-3 py-2 font-semibold text-ink hover:bg-tea-light"
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            {theme === "dark" ? "Light" : "Dark"}
+          </button>
           {authLinks}
         </div>
 
@@ -99,11 +118,32 @@ const Header = () => {
                 {link.label}
               </NavLink>
             ))}
+            {user && (
+              <NavLink to="/my-proposals" onClick={closeMenu} className={navClass}>
+                My proposals
+              </NavLink>
+            )}
           </nav>
           <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
             {installButton}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="rounded-md border border-line px-3 py-2 font-semibold text-ink hover:bg-tea-light"
+            >
+              {theme === "dark" ? "Light mode" : "Dark mode"}
+            </button>
             {authLinks}
           </div>
+        </div>
+      )}
+
+      {updateReady && (
+        <div role="status" className="flex flex-wrap items-center justify-center gap-3 border-t border-line bg-tea-light px-4 py-3 text-sm text-tea-dark">
+          <span>A new version is ready.</span>
+          <button type="button" onClick={applyUpdate} className="font-bold underline underline-offset-4">
+            Update now
+          </button>
         </div>
       )}
 

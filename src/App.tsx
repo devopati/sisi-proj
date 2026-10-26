@@ -251,6 +251,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Monitoring from "./pages/Monitoring";
+import MyProposals from "./pages/MyProposals";
 import NotFound from "./pages/NotFound";
 import Participate from "./pages/Participate";
 import ProjectDetails from "./pages/ProjectDetails";
@@ -281,6 +282,15 @@ const App = () => {
         />
         <Route path="projects/monitoring" element={<Monitoring />} />
         <Route path="projects/:id/:slug?" element={<ProjectDetails />} />
+
+        <Route
+          path="my-proposals"
+          element={
+            <RequireAuth>
+              <MyProposals />
+            </RequireAuth>
+          }
+        />
 
         <Route path="wards" element={<Wards />} />
         <Route path="wards/:id" element={<WardDetails />} />

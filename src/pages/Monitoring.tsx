@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import MoneySummary from "../components/projects/MoneySummary";
 import WardSpending from "../components/projects/WardSpending";
@@ -11,10 +12,40 @@ import { type Project, type Stats } from "../types";
 import { formatKES, isFunded } from "../utils/format";
 import { projectPath } from "../utils/paths";
 
+type SortKey = "budget" | "spent" | "progress";
+type SortDirection = "asc" | "desc";
+
 const Monitoring = () => {
   const stats = useFetch<Stats>("/stats");
   const projects = useFetch<Project[]>("/projects");
   const funded = projects.data?.filter((project) => isFunded(project.status)) ?? [];
+  const [sortBy, setSortBy] = useState<SortKey>("budget");
+  const [direction, setDirection] = useState<SortDirection>("desc");
+
+  const sortedProjects = useMemo(() => {
+    const rows = [...funded];
+    rows.sort((a, b) => {
+      const left = sortBy === "budget" ? a.budget : sortBy === "spent" ? a.spent : a.progress;
+      const right = sortBy === "budget" ? b.budget : sortBy === "spent" ? b.spent : b.progress;
+      return direction === "asc" ? left - right : right - left;
+    });
+    return rows;
+  }, [direction, funded, sortBy]);
+
+  const handleSort = (key: SortKey) => {
+    if (sortBy === key) {
+      setDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortBy(key);
+    setDirection("desc");
+  };
+
+  const getSortState = (key: SortKey) => {
+    if (sortBy !== key) return "none";
+    return direction === "asc" ? "ascending" : "descending";
+  };
 
   return (
     <div className="flex flex-col gap-14">
@@ -51,13 +82,25 @@ const Monitoring = () => {
                   <th className="px-4 py-3 font-semibold">Project</th>
                   <th className="px-4 py-3 font-semibold">Ward</th>
                   <th className="px-4 py-3 font-semibold">Stage</th>
-                  <th className="px-4 py-3 text-right font-semibold">Budget</th>
-                  <th className="px-4 py-3 text-right font-semibold">Spent</th>
-                  <th className="w-44 px-4 py-3 font-semibold">Built</th>
+                  <th aria-sort={getSortState("budget")} className="px-4 py-3 text-right font-semibold">
+                    <button type="button" onClick={() => handleSort("budget")} className="inline-flex items-center gap-2">
+                      Budget {sortBy === "budget" ? (direction === "asc" ? "↑" : "↓") : ""}
+                    </button>
+                  </th>
+                  <th aria-sort={getSortState("spent")} className="px-4 py-3 text-right font-semibold">
+                    <button type="button" onClick={() => handleSort("spent")} className="inline-flex items-center gap-2">
+                      Spent {sortBy === "spent" ? (direction === "asc" ? "↑" : "↓") : ""}
+                    </button>
+                  </th>
+                  <th aria-sort={getSortState("progress")} className="w-44 px-4 py-3 font-semibold">
+                    <button type="button" onClick={() => handleSort("progress")} className="inline-flex items-center gap-2">
+                      Built {sortBy === "progress" ? (direction === "asc" ? "↑" : "↓") : ""}
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {funded.map((project) => (
+                {sortedProjects.map((project) => (
                   <tr key={project.id}>
                     <td className="px-4 py-3">
                       <Link to={projectPath(project)} className="font-semibold hover:text-tea hover:underline">
