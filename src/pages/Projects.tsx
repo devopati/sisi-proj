@@ -12,11 +12,31 @@ import { useFetch } from "../hooks/useFetch";
 import { type Project, type Ward } from "../types";
 import { CATEGORIES, PROJECT_STATUSES } from "../utils/constants";
 
+const ProjectSearch = ({ query, onQueryChange }: { query: string; onQueryChange: (value: string) => void }) => {
+  const [searchText, setSearchText] = useState(query);
+  const debouncedSearch = useDebounce(searchText, 400);
+
+  useEffect(() => {
+    if (debouncedSearch !== query) onQueryChange(debouncedSearch);
+  }, [debouncedSearch, onQueryChange, query]);
+
+  return (
+    <InputField
+      label="Search"
+      type="search"
+      value={searchText}
+      onChange={(e) => setSearchText(e.target.value)}
+      placeholder="Borehole, road, market..."
+    />
+  );
+};
+
 const Projects = () => {
   // Filters live in the URL (/projects?status=Pending&wardId=2), so a filtered list can be shared.
   // The same query string goes straight to the API.
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: projects, loading, error, refetch } = useFetch<Project[]>(`/projects?${searchParams}`);
+  const query = searchParams.toString();
+  const { data: projects, loading, error, refetch } = useFetch<Project[]>(`/projects${query ? `?${query}` : ""}`);
   const { data: wards } = useFetch<Ward[]>("/wards");
 
   const status = searchParams.get("status") ?? "";
@@ -24,20 +44,6 @@ const Projects = () => {
   const category = searchParams.get("category") ?? "";
   const q = searchParams.get("q") ?? "";
   const sort = searchParams.get("sort") ?? "newest";
-  const [searchText, setSearchText] = useState(q);
-  const debouncedSearch = useDebounce(searchText, 400);
-
-  useEffect(() => {
-    setSearchText(q);
-  }, [q]);
-
-  useEffect(() => {
-    if (debouncedSearch === q) return;
-    const next = new URLSearchParams(searchParams);
-    if (debouncedSearch) next.set("q", debouncedSearch);
-    else next.delete("q");
-    setSearchParams(next, { replace: true });
-  }, [debouncedSearch, q, searchParams, setSearchParams]);
 
   const hasFilters = Boolean(status || wardId || category || q);
 
@@ -78,12 +84,10 @@ const Projects = () => {
 
       <div className="flex flex-col gap-5">
         <div className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_1fr]">
-          <InputField
-            label="Search"
-            type="search"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            placeholder="Borehole, road, market..."
+          <ProjectSearch
+            key={q}
+            query={q}
+            onQueryChange={(value) => setFilter("q", value)}
           />
           <SelectField label="Ward" value={wardId} onChange={(e) => setFilter("wardId", e.target.value)}>
             <option value="">All wards</option>

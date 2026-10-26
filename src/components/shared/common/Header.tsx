@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router";
 import { useAuth } from "../../../hooks/useAuth";
 import { useInstallPrompt } from "../../../hooks/useInstallPrompt";
+import { useServiceWorkerUpdate } from "../../../hooks/useServiceWorkerUpdate";
 import { useTheme } from "../../../hooks/themeContext";
 import { useToast } from "../../../hooks/toastContext";
 import LinkButton from "../ui/LinkButton";
@@ -21,6 +22,7 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 const Header = () => {
   const { user, signOut } = useAuth();
   const { canInstall, install } = useInstallPrompt();
+  const { updateReady, applyUpdate } = useServiceWorkerUpdate();
   const { theme, setTheme } = useTheme();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -133,6 +135,15 @@ const Header = () => {
             </button>
             {authLinks}
           </div>
+        </div>
+      )}
+
+      {updateReady && (
+        <div role="status" className="flex flex-wrap items-center justify-center gap-3 border-t border-line bg-tea-light px-4 py-3 text-sm text-tea-dark">
+          <span>A new version is ready.</span>
+          <button type="button" onClick={applyUpdate} className="font-bold underline underline-offset-4">
+            Update now
+          </button>
         </div>
       )}
 

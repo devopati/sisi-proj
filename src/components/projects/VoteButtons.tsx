@@ -12,12 +12,13 @@ const baseClass =
   "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60";
 
 const VoteButtons = ({ projectId, initialVotes }: VoteButtonsProps) => {
-  const { votes, myVote, sending, error, vote } = useVote(projectId, initialVotes);
+  const { votes, myVote, sending, error, queued, vote } = useVote(projectId, initialVotes);
   const { showToast } = useToast();
 
   const handleVote = async (choice: "support" | "reject") => {
     const didVote = await vote(choice);
-    if (didVote) showToast("Vote recorded");
+    if (didVote === "sent") showToast("Vote recorded");
+    if (didVote === "queued") showToast("Will send when you're back online");
   };
 
   return (
@@ -53,6 +54,7 @@ const VoteButtons = ({ projectId, initialVotes }: VoteButtonsProps) => {
           You voted to {myVote}. Click the other button to change your vote.
         </p>
       )}
+      {queued && <p role="status" className="text-sm text-maize-dark">Will send when you're back online.</p>}
       {error && <p className="text-sm text-murram">{error}</p>}
     </div>
   );
