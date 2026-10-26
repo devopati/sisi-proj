@@ -1,5 +1,6 @@
-// Override with VITE_API_URL in a .env.local file if the API runs somewhere else
-export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
+// Keep API requests same-origin so the service worker can cache them.
+// Set VITE_API_URL to a same-origin API path when deploying behind a reverse proxy.
+export const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 
 type Options = { method?: "GET" | "POST"; body?: unknown; token?: string };
 
